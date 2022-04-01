@@ -10,7 +10,7 @@ public class CameraController : MonoBehaviour
           headRotationLimit = 45f;
     float yAdjust, standoffAdjust;
     PlayerController player;
-    Vector2 mouse;
+    public Vector2 mouse;
     void Awake() {
         Application.targetFrameRate = 60;
         Cursor.visible = false;

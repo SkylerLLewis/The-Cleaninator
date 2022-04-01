@@ -11,6 +11,7 @@ public class PlayerController : MonoBehaviour
     float horizontalInput, verticalInput, deltaY;
     Vector2 mouse;
     float speed = 20, maxSpeed = 4, sensitivity = 10, maxTurn = 100;
+    CameraController camera;
 
     // * Resources
     UIController uiController;
@@ -27,16 +28,27 @@ public class PlayerController : MonoBehaviour
     Transform hammer;
     float hammerBase = 0.1f, hammerExtend = 1f;
 
+    Transform gun;
+    ParticleSystem bulletEmitter;
+
     void Awake() {
         body = gameObject.GetComponent<Rigidbody>();
         uiController = GameObject.FindWithTag("Canvas").GetComponent<UIController>();
+        camera = GameObject.FindWithTag("MainCamera").GetComponent<CameraController>();
+
+        foreach (Transform child in transform) {
+            if (child.name == "Hammer") {
+                hammer = child;
+            } else if (child.name == "Gun") {
+                gun = child;
+                // The bullet bulletEmitter is the gun's first child
+                bulletEmitter = child.GetChild(0).gameObject.GetComponent<ParticleSystem>();
+            }
+        }
 
         mouse = Vector2.zero;
 
         charge = 100;
-
-        // For now, the transform of the hammer is the 0th child
-        hammer = transform.GetChild(0);
 
         InvokeRepeating("UpdateCharge", 0.25f, 0.25f);
     }
@@ -44,6 +56,24 @@ public class PlayerController : MonoBehaviour
     void Update() {
         mouse.x += Input.GetAxis("Mouse X") * sensitivity;
 
+        // Gun adjustment
+        Vector3 gunAng = transform.eulerAngles;
+        if (camera.transform.eulerAngles.x <= 0) {
+            gun.eulerAngles = new Vector3(camera.transform.eulerAngles.x-5, gunAng.y, gunAng.z);
+        } else {
+            gun.eulerAngles = new Vector3(camera.transform.eulerAngles.x/10-5, gunAng.y, gunAng.z);
+        }
+        /*Vector3 bulletAng = camera.transform.eulerAngles;
+        bulletAng.x -= 5;
+        bulletAng.y += 1;*/
+
+        // Left click
+        if (Input.GetMouseButtonDown(0)) {
+            bulletEmitter.transform.eulerAngles = camera.transform.eulerAngles;
+            bulletEmitter.Emit(1);
+        }
+        
+        // Right click (right hand item)
         if (Input.GetMouseButtonDown(1) && !rightHandActive) {
             rightHandActive = true;
             hammerActive = true;
@@ -52,8 +82,9 @@ public class PlayerController : MonoBehaviour
             UpdateCharge();
         }
 
+        // handle hammer/ right hand
         if (rightHandCount > 0) { // Hammer strikes for .05 sec, ret .45
-            Vector3 pos = new Vector3(0.25f, 2, 0);
+            Vector3 pos = new Vector3(0.25f, 0.2f, 0);
             if (rightHandCount > 0.45f) {
                 pos.z = hammerBase + hammerExtend * (0.5f - rightHandCount)/0.05f;
             } else {
@@ -72,9 +103,13 @@ public class PlayerController : MonoBehaviour
         // Look around
         //mouse.x += Input.GetAxis("Mouse X") * sensitivity;
 
-        if (mouse.x != 0) {
-            deltaY = Mathf.DeltaAngle(transform.eulerAngles.y, mouse.x);
-            body.AddTorque(Vector3.up*Mathf.Clamp(deltaY/10, -maxTurn, maxTurn));
+        deltaY = Mathf.DeltaAngle(transform.eulerAngles.y, mouse.x);
+        if (Mathf.Abs(deltaY) > 0.1f) {
+            if (deltaY > 0) {
+                body.AddTorque(Vector3.up*Mathf.Clamp(deltaY/10+1, -maxTurn, maxTurn));
+            } else {
+                body.AddTorque(Vector3.up*Mathf.Clamp(deltaY/10-1, -maxTurn, maxTurn));
+            }
         }
 
         // Move!
@@ -105,7 +140,7 @@ public class PlayerController : MonoBehaviour
     }
 
     public void HammerHit(bool destroyed=false) {
-        body.AddForce(transform.forward*-200);
+        body.AddForce(transform.forward*-200 - body.velocity);
         body.AddForce(transform.up*100);
         if (destroyed) {
             iron += 100;
